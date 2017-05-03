@@ -15,6 +15,12 @@ namespace Core;
 class Action extends \Core\Object 
 {
     /**
+     * Разделитель пространств имен в полном имени класса
+     * 
+     * @var string
+     */
+    public static $NamespaceSeparator = '\\';
+    /**
      * Реальный путь текущего действия
      * 
      * Путь переданный в адресной строке может содержать, или не содержать в себе - код языка,
@@ -58,7 +64,7 @@ class Action extends \Core\Object
      * 
      * @var string
      */
-    public $PrefixClass ='\\Controller';
+    public $PrefixClass ='Controller';
     /**
      * Имя метода контроллера без префикса.
      * 
@@ -109,12 +115,10 @@ class Action extends \Core\Object
     /**
      * Запуск метода контроллера с передачей параметров
      * 
-     * @param array $data Передаваемые методу параметры
      * @return $mixed Возвращает результат выполнения метода
      */
-    public function Execute($data=[]) {  
-        $class = $this->PrefixClass ."\\". $this->Class;
-        $args = [$data];
+    public function Execute() {  
+        $class = $this->PrefixClass .self::$NamespaceSeparator. $this->Class;
         if (!class_exists($class)) { 
             $this->ErrorMsg(sprintf($this->ErrorList[0], $class), __FILE__, __LINE__);
         } else {
@@ -122,10 +126,10 @@ class Action extends \Core\Object
         }
         $reflection = new \ReflectionClass($class);
         if(!$reflection->hasMethod($this->PrefixMethod.$this->Method)) $this->Method = 'Index';
-        if($reflection->hasMethod($this->PrefixMethod.$this->Method) && $reflection->getMethod($this->PrefixMethod.$this->Method)->getNumberOfRequiredParameters() <= count($args)) {
-            return call_user_func_array(array($controller, $this->PrefixMethod.$this->Method), $args);
+        if($reflection->hasMethod($this->PrefixMethod.$this->Method) &&  $reflection->getMethod($this->PrefixMethod.$this->Method)->getNumberOfRequiredParameters() == 0 ) {
+            return call_user_func_array(array($controller, $this->PrefixMethod.$this->Method));
         } else {
-            $this->ErrorMsg(sprintf($this->ErrorList[1], $this->PrefixClass ."\\". $this->Class, $this->PrefixMethod.$this->Method), __FILE__, __LINE__);
+            $this->ErrorMsg(sprintf($this->ErrorList[1], $this->PrefixClass .self::$NamespaceSeparator. $this->Class, $this->PrefixMethod.$this->Method), __FILE__, __LINE__);
         }
     }
     /**
@@ -133,15 +137,19 @@ class Action extends \Core\Object
      * 
      * Определение контроллера, его метода и кода языка сайта по заданному пути
      * 
-     * @param mixed $route Адресная строка браузера
+     * @param mixed $route Часть адресной строки браузера, путь к странице
      * @param bool $error Флаг запрещающий подстановку NotFound если класс контроллера не найден
      * @throws \Exception
      */
     protected function ParseRoute($route, $error=false){
-        $this->PrefixClass = \Helper::$String->StrToClass($this->PrefixClass, true, false);
-        $route = \Helper::$String->StrToPath($route, false, false);
+        if($route=='') {
+            if(\Registry::IsLogin()) $route = \Registry::$Request->PathStart;
+            else $route = \Registry::$Request->PathDefault;
+        } else $route = \Helper::$String->StrToPath($this->PrefixClass, false, false);
+        $this->PrefixClass = \Helper::$String->StrToClass($this->PrefixClass, true, false, self::$NamespaceSeparator);
         $class = \Helper::$String->StrToClass($route, false, false);
-        if (class_exists($this->PrefixClass ."\\". $class)) {
+        // Ищем класс соответствующий указанному полному пути
+        if (class_exists($this->PrefixClass .self::$NamespaceSeparator. $class)) {
             $this->Class = $class;
             $this->Method = 'Index';
             $this->Path = $route;
@@ -149,11 +157,13 @@ class Action extends \Core\Object
             $this->PathFull = $this->PathShort.DIRECTORY_SEPARATOR. mb_strtolower($this->Method);
             return true;
         }
-        $class_tmp = explode("\\", $class);
+        $class_tmp = explode(self::$NamespaceSeparator, $class);
+        // Ищем класс соответствующий указанному пути за исключением последнего слова пути,
+        // которое определяет метод
         if(count($this->Path)>1) {
             $this->Method = array_pop($class_tmp);
-            $class_tmp = implode('\\', $class_tmp);
-            if(class_exists($this->PrefixClass ."\\". $class_tmp)){
+            $class_tmp = implode(self::$NamespaceSeparator, $class_tmp);
+            if(class_exists($this->PrefixClass .self::$NamespaceSeparator. $class_tmp)){
                 $this->Class = $class_tmp;
                 $this->Path = $route;
                 $this->PathShort = \Helper::$String->StrToPath($class_tmp, false, false);
@@ -161,12 +171,14 @@ class Action extends \Core\Object
                 return true;
             }
         }
-        $class_tmp = explode("\\", $class);
+        $class_tmp = explode(self::$NamespaceSeparator, $class);
         if(count($class_tmp)>1) {
             $this->Lng = mb_strtolower(array_shift($class_tmp));
-            if(\Registry::LngExistsCode($this->Lng)){
-                $class_tmp = implode('\\', $class_tmp);
-                if(class_exists($this->PrefixClass ."\\". $class_tmp)){
+            if(\Registry::LngExists($this->Lng)){
+                $class_tmp = implode(self::$NamespaceSeparator, $class_tmp);
+        // Ищем класс соответствующий указанному пути за исключением первого слова пути,
+        // которое определяет язык перевода
+                if(class_exists($this->PrefixClass .self::$NamespaceSeparator. $class_tmp)){
                     $this->Class = $class_tmp;
                     $this->Method = 'Index';
                     $this->Path = \Helper::$String->StrToPath($class_tmp, false, false);
@@ -175,11 +187,13 @@ class Action extends \Core\Object
                     \Registry::$Lng->SetCode($this->Lng);
                     return true;
                 }
-                $class_tmp = explode("\\", $class_tmp);
+                $class_tmp = explode(self::$NamespaceSeparator, $class_tmp);
+        // Ищем класс соответствующий указанному пути за исключением первого слова пути,
+        // которое определяет язык перевода и последнего слова пути, которое определяет метод
                 if(count($class_tmp)>1) {
                     $this->Method = array_pop($class_tmp);
-                    $class_tmp = implode('\\', $class_tmp);
-                    if(class_exists($this->PrefixClass ."\\". $class_tmp)){
+                    $class_tmp = implode(self::$NamespaceSeparator, $class_tmp);
+                    if(class_exists($this->PrefixClass .self::$NamespaceSeparator. $class_tmp)){
                         $this->Class = $class_tmp;
                         $this->PathShort = \Helper::$String->StrToPath($class_tmp, false, false);
                         $this->PathFull = $this->Path.DIRECTORY_SEPARATOR. mb_strtolower($this->Method);
@@ -189,10 +203,14 @@ class Action extends \Core\Object
                     }
                 }
             }
-        } else if(count($class_tmp)==1){
+        } else if(count($class_tmp)==1 && $route!=\Registry::$Request->PathStart && 
+                $route!=\Registry::$Request->PathDefault && $route!=\Registry::$Request->PathNotFound){
             $this->Lng = mb_strtolower($class_tmp[0]);
-            $class_tmp = \Helper::$String->StrToClass(\Registry::$Request->PathStart);
-            if(class_exists($this->PrefixClass ."\\". $class_tmp) && \Registry::LngExistsCode($this->Lng)){
+            if(\Registry::IsLogin()) $class_tmp = \Helper::$String->StrToClass(\Registry::$Request->PathStart);
+            else $class_tmp = \Helper::$String->StrToClass(\Registry::$Request->PathDefault);
+        // Предполагаем что указанный путь определяет только язык перевода,
+        // ищем класс соответствующий пути указанному по умолчанию
+            if(class_exists($this->PrefixClass .self::$NamespaceSeparator. $class_tmp) && \Registry::LngExists($this->Lng)){
                 $this->Class = $class_tmp;
                 $this->Method = 'Index';
                 $this->Path = \Helper::$String->StrToPath($class_tmp, false, false);

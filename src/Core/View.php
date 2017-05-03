@@ -9,8 +9,9 @@ namespace Core;
  * @uses \Registry
  * @uses \Core\Object
  * @uses \Core\Path
+ * @uses \Core\Request
  * @uses \Helper
- * @uses \Helper\Route
+ * @uses \Helper\Str
  * @uses \Helper\Json
  * 
  */
@@ -50,11 +51,11 @@ class View extends \Core\Object
      * @throws \Exception
      */
     public function Render($path, $data, $path_view=null) {
-        $path = \Helper::$Route->ToClass($path, true, false);
+        $path = \Helper::$String->StrToClass($path, false, false, DIRECTORY_SEPARATOR);
         if($path_view!=null){
-            $path_view = \Helper::$Route->ToClass($path_view);
+            $path_view = \Helper::$String->StrToClass($path_view, false, false, DIRECTORY_SEPARATOR);
         }
-        $file = ($path_view!==null?$path_view: dirname(__DIR__).DIRECTORY_SEPARATOR.\Registry::$Path->View.($this->Theme!=''?DIRECTORY_SEPARATOR.$this->Theme:'')).DIRECTORY_SEPARATOR.$path.$this->Extension;
+        $file = ($path_view!==null?$path_view: \Registry::$Path->View.($this->Theme!=''?DIRECTORY_SEPARATOR.$this->Theme:'')).DIRECTORY_SEPARATOR.$path.$this->Extension;
         if (file_exists($file)) {
             foreach ($data as $key => $value) {
                 ${$key}=$value;
@@ -84,8 +85,16 @@ class View extends \Core\Object
      * @param type $url Адрес для перенаправления
      * @param type $status Статус для перенаправления
      */
-    public function Redirect($url, $status = 302) {
-        header('Location: ' . str_replace(['&amp;', "\n", "\r"], ['&', '', ''], $url), true, $status); exit();
+    public function Redirect($url, $status = 302, $isAjax = false) {
+        header('Location: ' . str_replace(["\n", "\r"], ['', ''], $url), true, $status);
+        if(\Registry::IsAjax() || $isAjax) header( "X-Requested-With: XMLHttpRequest", true);
+        exit();
+    }
+    /**
+     * Перенаправление на страница не найдена
+     */
+    public function RedirectNotFound(){
+        \Registry::Redirect(\Registry::$Request->PathNotFound,['msg'=> \Registry::$Request->Server['REQUEST_URI']]);
     }
     
 }

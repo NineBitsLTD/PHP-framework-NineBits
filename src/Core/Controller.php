@@ -1,30 +1,30 @@
 <?php
 
-namespace Controller;
+namespace Core;
 /**
- * Базовый шаблон контроллера (раздел или страница сайта)
+ * Базовый шаблон контроллера, формирует логику раздела или страницы сайта
  * 
  * @uses \Registry
  * @uses \Core\Object
  * @uses \Core\Action
  * @uses \Helper
- * @uses \Helper\Route
+ * @uses \Helper\Str
  */
-class Home extends \Core\Object{ 
+class Controller extends \Core\Object {
     /**
-     * Название раздел или страницы сайта
+     * Название раздела или страницы сайта
      * 
      * Данное название как правило соответствует части пути адресной строки и является алиасом $this->Action->PathShort
      * 
      * @var string
      */
-    public $Page='';
+    public $Page = "";
     /**
-     * Действие запустившее текущий метод данного контроллера
+     * Действие запустившее контроллер
      * 
      * @var \Core\Action
      */
-    public $Action = null;
+    public $Action = null;    
     /**
      * Конструктор контроллера
      * 
@@ -36,6 +36,38 @@ class Home extends \Core\Object{
             $this->Page = $this->Action->PathShort;
         }
         parent::__construct();
+    }
+   
+    /**
+     * Адресная строка (след из хлебных крошек)
+     * 
+     * @param array $route Путь к странице
+     * @param array $dictionary Словарь переводов ключей пути
+     * @return array Вложенный массив содержащий массивы ссылок и названий
+     */
+    protected function breadcrumbs($route) {
+        $route = \Helper::$String->StrToClass($route);
+        $breadcrumbs = ['Home'=>[
+            'href'=>\Registry::Link('Home'),
+            'text'=>\Registry::Translate('HeaderMenu_Home')
+        ]];
+        $path = '';
+        $text = '';
+        $sep = '';
+        $i = 0;
+        foreach ($route as $value) {
+            $path .= $sep.$value;
+            $text .= $value;
+            $breadcrumbs[$value]=[
+                'text'=>\Registry::Translate("HeaderMenu_".$text)                
+            ];
+            if($i<(count($route)-1)){                
+                $breadcrumbs[$value]['href']=\Registry::Link($path);
+            }
+            $sep = "/";
+            $i++;
+        }
+        return $breadcrumbs;
     }
     /**
      * Воспроизведение шаблона страницы или блока
@@ -61,15 +93,18 @@ class Home extends \Core\Object{
         $data['base'] = \Registry::Link();
         $data['link'] = \Registry::Link($this->Action->Path);
         $data['theme'] = \Registry::$View->Theme;
-        $data['page'] = str_replace(['/','\\'], '-', $this->Page);
+        $data['page'] = $this->Page;
+        $data['page_name'] = str_replace(['/','\\'], '-', $this->Page);
         if(!$data['ajax']){
             $data['header'] = $this->render('header', $data);
             $data['footer'] = $this->render('footer', $data);
         }
     }
 
-    public function methodIndex($data = array()) {
-        $this->setData($data);
-        echo $this->render($this->Action->PathShort.(mb_strtolower($this->Action->Method)!='index'?$this->Action->Method:''), $data);
+    public function MethodIndex() {
+        $this->setData(\Registry::$Data);
+        echo $this->render($this);
     }
+    
 }
+

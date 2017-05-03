@@ -9,15 +9,15 @@
  *  Пример использования: 
  *      require_once('../source/Registry.php');
  *      require_once('../source/Core/Autoloader.php');
- *      \Registry::$Autoloader = new \Core\Autoloader([''=>'../source/'], "../source/Plugins");
+ *      self::$Autoloader = new \Core\Autoloader([''=>'../source/'], "../source/Plugins");
  *      \Helper::$String = new \Helper\Str();
  *      \Helper::$Security = new \Helper\Security();
  *      \Helper::$File = new \Helper\File();
- *      \Registry::$Path = new \Core\Path();
- *      \Registry::$View = new \Core\View('');
- *      \Registry::$Request = new \Core\Request('home','home','not_found');
+ *      self::$Path = new \Core\Path();
+ *      self::$View = new \Core\View('');
+ *      self::$Request = new \Core\Request('home','home','not_found');
  *      
- *      \Registry::Dispatch();
+ *      self::Dispatch();
  * 
  * @uses \Core\Autoloader
  * @uses \Core\Action
@@ -102,8 +102,7 @@ class Registry
      * @var \Core\Mailer
      */
     public static $Mail = null;
-
-
+    
     /**
      * Определение контроллера для запуска страницы
      * 
@@ -112,13 +111,13 @@ class Registry
      * @return mixed Результат выполнения контроллера по определенному пути
      */
     public static function Dispatch() {
-        if(\Registry::$Request!=null){
-            if(\Registry::$Session!=null && array_key_exists('msg', \Registry::$Session->Data)) {
-                $this->Data['msg'] = \Registry::$Session->Data['msg'];
-                unset(\Registry::$Session->Data['msg']);
+        if(self::$Request!=null){
+            if(self::$Session!=null && \Helper::$Array->KeyIsSet('msg', self::$Session->Data)) {
+                $this->Data['msg'] = self::$Session->Data['msg'];
+                unset(self::$Session->Data['msg']);
             }
-            \Registry::$Action = new \Core\Action(\Registry::$Request->Path);            
-            return \Registry::$Action->Execute(self::$Data);
+            self::$Action = new \Core\Action(self::$Request->Path);            
+            return self::$Action->Execute();
         }
         return null;
     }    
@@ -130,8 +129,8 @@ class Registry
      * @return string
      */
     public static function Link($path="", $request=[]){
-        if(\Registry::$Request!=null){
-            $root = \Registry::$Request->Server['SCRIPT_NAME'];
+        if(self::$Request!=null){
+            $root = self::$Request->Server['SCRIPT_NAME'];
             if(strpos($root, "index.php")!==false){
                 $root = substr($root, 0, strpos($root, "index.php"));
             }
@@ -139,41 +138,21 @@ class Registry
             if(is_array($request) || is_object($request)){
                 $request = http_build_query($request);
             }
-            return \Registry::$Request->Server['REQUEST_SCHEME']."://".\Registry::$Request->Server['SERVER_NAME'].$root.$path.((string)$request==""?"":"?".$request);
+            return self::$Request->Server['REQUEST_SCHEME']."://".self::$Request->Server['SERVER_NAME'].$root.$path.((string)$request==""?"":"?".$request);
         }
         return "";
-    }
-    /**
-     * Перенаправление страници к другому узлу сайта
-     * 
-     * @param Array $path Путь к странице
-     * @param Array $request Параметры передаваемые странице
-     * @param int $status Статус передаваемый при перенаправлении
-     * @param bool $isAjax Указывает на то что это Ajax запрос
-     */
-    public static function Redirect($path="", $request=[], $status = 302, $isAjax = false){
-        header('Location: ' . \Registry::Link($path, $request), true, $status);
-        if(\Registry::IsAjax() || $isAjax) header( "X-Requested-With: XMLHttpRequest", true);
-        exit();
-    }
-    /**
-     * Перенаправление на страница не найдена
-     */
-    public static function RedirectNotFound(){
-        \Registry::Redirect(\Registry::$Request->PathNotFound,['msg'=>$_SERVER['REQUEST_URI']]);
     }
     /**
      * Выполнение произвольного метода произвольного контроллера по указанному пути
      * 
      * @param mixed $route Mаршрут к контроллеру
-     * @param array $data Передаваемые методу параметры
      * @param string $prefixClass Корень пространства имен контроллера
      * @param string $prefixMethod Приставка к имени метода контроллера
      * @param bool $error Если TRUE, то запрещает подстановку NotFound, когда класс контроллера не найден (требуется для исключения зацикливания перехода по NotFound)
      * @return mixed Возвращает результат выполнения метода
      */
-    public static function Controller($route, $data=[], $prefixClass=null, $prefixMethod=null, $error=false){        
-        return (new Action($route, $prefixClass, $prefixMethod, $error))->Execute($data);
+    public static function Controller($route, $prefixClass=null, $prefixMethod=null, $error=false){        
+        return (new Action($route, $prefixClass, $prefixMethod, $error))->Execute();
     }
     /**
      * Определяет послан ли запрос через Ajax
@@ -181,23 +160,37 @@ class Registry
      * @return boolean
      */
     public static function IsAjax(){
-        return (\Registry::$Request!=null && array_key_exists('HTTP_X_REQUESTED_WITH',\Registry::$Request->Server) && strtolower(\Registry::$Request->Server['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest');
+        return (self::$Request!=null && array_key_exists('HTTP_X_REQUESTED_WITH',self::$Request->Server) && strtolower(self::$Request->Server['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest');
+    }
+    /**
+     * Определяет авторизирован ли пользователь
+     * 
+     * @return boolean Если пользователь авторизирован возвращает true, в противном случае false
+     */
+    public static function IsLogin(){
+        return self::$Session!=null && self::$Session->IsLogin();
     }
     /**
      * Переводит ключь или массив ключей
      * 
      * @param mixed $key Ключь или массив ключей для перевода
-     * @param string $code Трехбуквенный код языка, если не указан используется \Registry::Code
+     * @param string $code Трехбуквенный код языка, если не указан используется self::Code
      * @return mixed Возвращает переведенную строку или массив переводов без изменения ключей массива
      */
     public static function Translate($key, $code=null){
-        if(isset(\Registry::$Lng)){
-            //if(!isset(\Registry::$Lng)) \Registry::$Lng = new \Config\Lng($this);
-            //return \Registry::$Lng->Translate($key, $code);
+        if(isset(self::$Lng)){
+            //if(!isset(self::$Lng)) self::$Lng = new \Config\Lng($this);
+            //return self::$Lng->Translate($key, $code);
         }
         return $key;
     }
-    public static function LngExistsCode($code){
-        return (isset(\Registry::$Lng) && \Registry::$Lng->ExistsCode($code));
+    /**
+     * Определяет наличие словаря
+     * 
+     * @param string $code
+     * @return bool
+     */
+    public static function LngExists($code){
+        return (isset(self::$Lng) && self::$Lng->ExistsCode($code));
     }
 }

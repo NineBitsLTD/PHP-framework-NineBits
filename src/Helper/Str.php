@@ -68,7 +68,7 @@ class Str
      * @param mixed $route
      * @return string
      */
-    public function StrToClass($route, $slash_start = null, $slash_end = null){
+    public function StrToClass($route, $slash_start = null, $slash_end = null, $separator = '\\'){
         $route = $this->StrToPath($route, $slash_start, $slash_end);
         $route = str_replace('-', '_', $route);
         $route = preg_replace('/[^a-zA-Z0-9_\/]/', '', $route);
@@ -82,7 +82,7 @@ class Str
             $className[$key] = implode('', $pieces);
             $i++;
         }
-        return $this->PathNormalize($className, $slash_start, $slash_end, "\\");
+        return $this->PathNormalize($className, $slash_start, $slash_end, $separator);
     }
     /**
      * Преобразование строки или имени класса в путь. Пример controller/not_found
@@ -90,9 +90,9 @@ class Str
      * @param mixed $className
      * @return array
      */
-    public function StrToPath($className, $slash_start = null, $slash_end = null){
-        $className = $this->PathNormalize($className, $slash_start, $slash_end);
-        $route = explode(DIRECTORY_SEPARATOR, $className);
+    public function StrToPath($className, $slash_start = null, $slash_end = null, $separator = DIRECTORY_SEPARATOR){
+        $className = $this->PathNormalize($className, $slash_start, $slash_end, $separator);
+        $route = explode($separator, $className);
         foreach ($route as $key => $value) {
             $pieces = "";
             foreach (preg_split('//u',$value,-1,PREG_SPLIT_NO_EMPTY) as $ckey=>$char) {
@@ -101,6 +101,6 @@ class Str
             }
             $route[$key] = strtolower($pieces);
         }
-        return $this->PathNormalize($route, $slash_start, $slash_end, DIRECTORY_SEPARATOR);
+        return $this->PathNormalize($route, $slash_start, $slash_end, $separator);
     }    
 }

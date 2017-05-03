@@ -6,15 +6,15 @@
     /**
      *  Нарушение последовательности выполняемых операций, может привести к ошибкам.
      */
-    require_once('source/Registry.php');
-    require_once('source/Core/Autoloader.php');
-    \Registry::$Autoloader = new \Core\Autoloader([''=>'source/'], "source/Plugins");
+    require_once('src/Registry.php');
+    require_once('src/Core/Autoloader.php');
+    \Registry::$Autoloader = new \Core\Autoloader([''=>'src/'], "src/Plugins");
     \Helper::$Number = new \Helper\Number();
     \Helper::$String = new \Helper\Str();
     \Helper::$Security = new \Helper\Security();
     \Helper::$File = new \Helper\File();
     \Registry::$Path = new \Core\Path();
-    \Registry::$View = new \Core\View('Default');
+    \Registry::$View = new \Core\View('');
     \Registry::$Request = new \Core\Request('home','home','not_found');
     //$Registry->DB = new \Sys\DataBase($Registry, new \Sys\DataBase\MySql(new \Sys\Config\DataBase($Registry)));
     //$Registry->DB->Connect();
